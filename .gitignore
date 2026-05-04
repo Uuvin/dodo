@@ -1,91 +1,20 @@
-# =========================
-# Spring Boot 보안
-# =========================
-application.properties
-application.yml
-application-dev.yml
-application-prod.yml
-
-# =========================
-# Spring Boot / Maven 빌드
-# =========================
-target/
-*.jar
-*.war
-*.ear
-*.class
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-
-# =========================
-# React / TS
-# =========================
 node_modules/
 dist/
 build/
-*.tsbuildinfo
 
-# env
 .env
 .env.local
 .env.development
 .env.production
-.env.*.local
 
-# =========================
-# IntelliJ
-# =========================
 .idea/
-*.iml
 
-# =========================
-# VSCode
-# =========================
-.vscode/
-*.code-workspace
 
-# =========================
-# OS - Windows
-# =========================
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
-[Dd]esktop.ini
 $RECYCLE.BIN/
-*.lnk
 
-# =========================
-# OS - Mac
-# =========================
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
 
-# =========================
-# 임시 / 로그
-# =========================
 *.tmp
-*.bak
-*.swp
-*.log
-logs/
 
-# =========================
-# 압축 파일
-# =========================
-*.zip
-*.tar.gz
-*.rar
-
-# =========================
-# Web (불필요 파일 차단)
-# =========================
-*.asp
-*.php
-*.rss
