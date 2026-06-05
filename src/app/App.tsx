@@ -1,8 +1,8 @@
 import { useState } from 'react';
 
 import { Header } from './components/home/Header';
-import { SettingsModal } from './components/home/Settings';
-import Notice from './components/home/Notice';
+import { SettingsModal } from './components/setting/Settings';
+import Notice from './components/notice/Notice';
 
 import AIBriefing from './components/home/AIBriefing';
 import { TodaySchedule } from './components/home/TodaySchedule';
