@@ -1,0 +1,14 @@
+package com.dodo.home.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+import java.util.List;
+
+@Getter
+@AllArgsConstructor
+public class HomeResponseDto {
+    private List<TodayScheduleDto> todaySchedules;
+    private List<RoutineDto> routines;
+    private String aiMessage;
+}
