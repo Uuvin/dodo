@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="back.user.mapper.UserMapper">
+
+    <insert id="insertUser" parameterType="back.user.entity.User" useGeneratedKeys="true" keyProperty="userNo">
+        INSERT INTO USERS (
+            USER_EML, USER_PSWD, USER_NM, USER_NICK, 
+            USER_TELNO, USER_PROVIDER, USER_PROVIDER_ID
+        ) VALUES (
+            #{userEml}, #{userPswd}, #{userNm}, #{userNick}, 
+            #{userTelno}, #{userProvider}, #{userProviderId}
+        )
+    </insert>
+
+    <insert id="insertSettings" parameterType="back.user.entity.User">
+        INSERT INTO SETTINGS (USER_NO) 
+        VALUES (#{userNo})
+    </insert>
+
+</mapper>
