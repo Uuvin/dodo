@@ -11,17 +11,19 @@ export interface Event {
   time: string;
   endDate?: Date;
   type: string;                  // 'schedule' | 'routine'
-  displayType: 'range' | 'todo'; // 구간일정 vs 할일(네모블록)
+  displayType: 'schedule' | 'range' | 'todo'; // 일정(단일) / 구간일정 / 할일(네모블록)
   color: string;
   memo?: string;
   completedDates?: string[];     // 완료된 날짜 (yyyy-MM-dd)
   repeat: 'none' | 'weekly' | 'monthly' | 'yearly';
+  repeatDays?: number[]; // 0=일 1=월 2=화 3=수 4=목 5=금 6=토
 }
 
 export function Calendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [events, setEvents] = useState<Event[]>([]);
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [popoverDate, setPopoverDate] = useState<Date | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -45,19 +47,32 @@ export function Calendar() {
       return tDate >= sDate && tDate <= eDate;
     }
     const durationDays = differenceInDays(eDate, sDate);
-    if (event.repeat === 'weekly') {
-      const remainder = differenceInDays(tDate, sDate) % 7;
-      return remainder >= 0 && remainder <= durationDays;
-    }
-    if (event.repeat === 'monthly') {
-      const monthDiff = (tDate.getFullYear() - sDate.getFullYear()) * 12 + (tDate.getMonth() - sDate.getMonth());
-      for (let i = Math.max(0, monthDiff - 1); i <= monthDiff + 1; i++) {
-        const movedStart = addMonths(sDate, i);
-        const movedEnd = addDays(movedStart, durationDays);
-        if (tDate >= startOfDay(movedStart) && tDate <= startOfDay(movedEnd)) return true;
-      }
-      return false;
-    }
+if (event.repeat === 'weekly') {
+
+  if (
+    event.repeatDays &&
+    event.repeatDays.length > 0
+  ) {
+    return event.repeatDays.includes(
+      tDate.getDay()
+    );
+  }
+
+  return tDate.getDay() === sDate.getDay();
+}
+if (event.repeat === 'monthly') {
+
+  if (
+    event.repeatDays &&
+    event.repeatDays.length > 0
+  ) {
+    return event.repeatDays.includes(
+      tDate.getDate()
+    );
+  }
+
+  return tDate.getDate() === sDate.getDate();
+}
     if (event.repeat === 'yearly') {
       const yearDiff = tDate.getFullYear() - sDate.getFullYear();
       for (let i = Math.max(0, yearDiff - 1); i <= yearDiff + 1; i++) {
@@ -75,6 +90,19 @@ export function Calendar() {
     return events.filter(event => matchEventDate(event, date));
   };
 
+  // 💡 [추가] '일정(schedule)'이라도 시작일과 종료일이 다르면(여러 날에 걸친 일정)
+  // '구간(range)'과 동일하게 하단 화살표 트랙으로 이어진 한 줄로 표시합니다.
+  // displayType이 'range'인 경우, 그리고 'todo'(할 일 블록)는 항상 날짜 셀 블록으로 표시합니다.
+  const isContinuousDisplay = (event: Event) => {
+    if (event.displayType === 'range') return true;
+    if (event.displayType === 'schedule' && event.endDate) {
+      const sDate = format(new Date(event.date), 'yyyy-MM-dd');
+      const eDate = format(new Date(event.endDate), 'yyyy-MM-dd');
+      return sDate !== eDate;
+    }
+    return false;
+  };
+
   const goToToday = () => {
     const today = new Date();
     setCurrentMonth(today);
@@ -90,6 +118,19 @@ export function Calendar() {
 
   const handleUpdateEvent = (id: number, updatedEvent: Partial<Event>) => {
     setEvents((prev) => prev.map((event) => (event.id === id ? { ...event, ...updatedEvent } : event)));
+  };
+
+  // 💡 [추가] 캘린더 날짜 셀의 할 일(todo) 블록 체크박스 클릭 시 해당 날짜의 완료 상태를 토글
+  const handleToggleComplete = (event: Event, day: Date) => {
+    const dateIso = format(day, 'yyyy-MM-dd');
+    const completed = event.completedDates || [];
+    const exists = completed.includes(dateIso);
+
+    const updatedCompleted = exists
+      ? completed.filter((d) => d !== dateIso)
+      : [...completed, dateIso];
+
+    handleUpdateEvent(event.id, { completedDates: updatedCompleted });
   };
 
   const handleDeleteEvent = (id: number) => {
@@ -161,7 +202,7 @@ export function Calendar() {
           {weeks.map((week, weekIdx) => {
             const weekRangeEvents: Event[] = [];
             week.forEach(day => {
-              const ranges = getEventsForDay(day).filter(e => e.displayType === 'range');
+              const ranges = getEventsForDay(day).filter(e => isContinuousDisplay(e));
               ranges.forEach(re => {
                 if (!weekRangeEvents.some(we => we.id === re.id)) weekRangeEvents.push(re);
               });
@@ -178,7 +219,9 @@ export function Calendar() {
                   const isToday = isSameDay(day, new Date());
                   const dayOfWeek = day.getDay();
                   
-                  const todoEvents = getEventsForDay(day).filter(e => e.displayType === 'todo' || !e.displayType);
+                  // 💡 [수정] 연속 표시(range, 또는 여러 날에 걸친 schedule)는 하단 화살표 트랙에서 표시되므로
+                  // 그 외(todo, 하루짜리 schedule)만 날짜 셀 블록으로 표시합니다.
+                  const blockEvents = getEventsForDay(day).filter(e => !isContinuousDisplay(e));
                   const formattedIsoDate = format(day, 'yyyy-MM-dd');
 
                   return (
@@ -198,17 +241,34 @@ export function Calendar() {
                         </span>
                       </div>
 
-                      {/* 할 일(todo) 블록 컨테이너 - 개수가 늘어나면 날짜 셀 전체 높이를 밀어냄 */}
+                      {/* 일정/할 일 블록 컨테이너 - 개수가 늘어나면 날짜 셀 전체 높이를 밀어냄 */}
                       <div className="flex-1 flex flex-col gap-1 overflow-hidden pointer-events-none">
-                        {todoEvents.map((event) => {
+                        {blockEvents.map((event) => {
                           const colors = colorMap[event.color as keyof typeof colorMap] || colorMap.purple;
+                          const isTodo = event.displayType === 'todo';
+                          const isRoutine = event.type === 'routine';
+
+                          const canCheck =isTodo || isRoutine;
                           const isCompleted = event.completedDates?.includes(formattedIsoDate);
 
                           return (
                             <div
                               key={event.id}
-                              className={`px-2 py-0.5 text-[10px] font-bold rounded-md truncate ${colors.bg} ${isCompleted ? 'line-through opacity-45' : ''}`}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-md truncate flex items-center gap-1 ${colors.bg} ${isTodo && isCompleted ? 'line-through opacity-45' : ''}`}
                             >
+                              {/* 💡 [추가] 할 일(todo) 타입은 캘린더 셀에서도 체크박스로 완료 토글 가능 */}
+                              {isTodo && (
+                                <input
+                                  type="checkbox"
+                                  checked={!!isCompleted}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleComplete(event, day);
+                                  }}
+                                  onChange={() => {}}
+                                  className="pointer-events-auto w-2.5 h-2.5 flex-shrink-0 rounded cursor-pointer"
+                                />
+                              )}
                               {event.type === 'routine' && <span className="mr-0.5">🔄</span>}
                               <span className="truncate">{event.title}</span>
                             </div>
@@ -218,6 +278,8 @@ export function Calendar() {
                     </div>
                   );
                 })}
+
+                
 
                 {/* 2. 구간 일정(range) 양방향 화살표 오버레이 트랙 (하단에 깔끔하게 절대 정렬) */}
                 <div className="absolute inset-x-0 bottom-2 flex flex-col gap-1.5 pointer-events-none z-10 w-full px-[2px]">
@@ -241,6 +303,26 @@ export function Calendar() {
 
                     const hasLeftExtension = matchEventDate(event, addDays(week[0], -1));
                     const hasRightExtension = matchEventDate(event, addDays(week[6], 1));
+
+                    // 💡 [추가] 여러 날에 걸친 '일정(schedule)'은 '세일기간(range)'과 다르게
+                    // 화살표+라인이 아닌, 끊김 없이 이어지는 컬러 블록으로 표시합니다.
+                    if (event.displayType === 'schedule') {
+                      return (
+                        <div
+                          key={event.id}
+                          className="relative h-5 flex items-center"
+                          style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                        >
+                          <div
+                            className={`absolute inset-y-0 inset-x-0 flex items-center px-2 text-[10px] font-bold truncate pointer-events-auto ${colors.bg} ${
+                              hasLeftExtension ? 'rounded-l-none -ml-px' : 'rounded-l-md'
+                            } ${hasRightExtension ? 'rounded-r-none -mr-px' : 'rounded-r-md'}`}
+                          >
+                            <span className="truncate">{event.title}</span>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div 

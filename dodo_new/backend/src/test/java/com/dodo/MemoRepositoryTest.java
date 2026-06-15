@@ -1,4 +1,4 @@
-package com.dodo.memo.repository;
+package com.dodo;
 
 import com.dodo.memo.entity.Memo;
 import org.junit.jupiter.api.BeforeEach;
@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
+import com.dodo.memo.repository.MemoRepository;
 
 import java.util.List;
 import java.util.Optional;

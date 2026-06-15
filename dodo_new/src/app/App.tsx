@@ -1,17 +1,21 @@
 // App.tsx
+import { useState } from 'react'; 
+
 import { Header } from './components/homeboard/Header';
 import AIBriefing from './components/homeboard/AIBriefing';
 import { TodaySchedule } from './components/homeboard/TodaySchedule';
 import { UpcomingSchedule } from './components/homeboard/UpcomingSchedule';
-import { RegisteredRoutines } from './components/homeboard/RegisteredRoutines';
+// import { RegisteredRoutines } from './components/homeboard/RegisteredRoutines';
 import { Memo } from './components/homeboard/Memo';
 import { StoreRecommendation } from './components/homeboard/StoreRecommendation';
-import { useState } from 'react'; 
-
+import { SettingsModal } from './components/settings/Settings';
+import Notice from './components/notice/Notice';
 import { Calendar } from './components/calendar/Calendar'; // 💡 SidePanel 임포트는 삭제
 
 export default function App() {
+    // ✅ 현재 활성 메뉴
     const [activeMenu, setActiveMenu] = useState('HOME');
+    // ✅ 설정 모달 상태
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     return (
@@ -30,7 +34,7 @@ export default function App() {
                         <div className="col-span-2 lg:col-span-1"><Memo /></div>
                         <TodaySchedule />
                         <UpcomingSchedule />
-                        <RegisteredRoutines />
+                        {/* <RegisteredRoutines /> */}
                         <div className="col-span-2 lg:col-span-3"><StoreRecommendation /></div>
                     </div>
                 )}
@@ -41,7 +45,21 @@ export default function App() {
                         <Calendar />
                     </div>
                 )}
+
+                {/* ✅ 공지사항 화면 */}
+                {activeMenu === '공지사항' && (
+                    <Notice />
+                )}
+
             </main>
+
+            {/* ✅ 설정 모달 */}
+            {isSettingsOpen && (
+                <SettingsModal
+                    onClose={() => setIsSettingsOpen(false)}
+                />
+            )}
+        
         </div>
     );
 }

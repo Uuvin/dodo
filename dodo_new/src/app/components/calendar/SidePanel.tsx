@@ -22,7 +22,8 @@ export function SidePanel({
   onDeleteEvent,
 }: SidePanelProps) {
   const [activeTab, setActiveTab] = useState<string>('schedule'); 
-  const [displayType, setDisplayType] = useState<'range' | 'todo'>('range'); 
+  // 💡 [수정] 'schedule' | 'range' | 'todo' 3가지 타입으로 확장 (일정등록 / 구간등록 / 할일등록)
+  const [displayType, setDisplayType] = useState<'schedule' | 'range' | 'todo'>('schedule'); 
   const [title, setTitle] = useState('');
   const [startDateInput, setStartDateInput] = useState(format(selectedDate, 'yyyy-MM-dd'));
   const [endDateInput, setEndDateInput] = useState('');
@@ -33,10 +34,18 @@ export function SidePanel({
 
   const [scheduleColor, setScheduleColor] = useState('purple'); 
   const [routineColor, setRoutineColor] = useState('green');    
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
 
   useEffect(() => {
     setStartDateInput(format(selectedDate, 'yyyy-MM-dd'));
   }, [selectedDate]);
+
+  // 💡 [추가] 탭(일정/루틴) 전환 시 등록 타입을 기본값(일정 등록)으로 초기화합니다.
+  // 루틴 탭에서는 displayType이 항상 'schedule'로 고정되어 종료일 입력이 비활성화됩니다.
+  useEffect(() => {
+    setDisplayType('schedule');
+    setEndDateInput('');
+  }, [activeTab]);
 
   const selectedDateIso = format(selectedDate, 'yyyy-MM-dd');
   
@@ -62,17 +71,23 @@ export function SidePanel({
 
     const finalColor = activeTab === 'schedule' ? scheduleColor : routineColor;
 
-    onAddEvent({
-      title,
-      date: new Date(startDateInput),
-      endDate: displayType === 'range' && endDateInput ? new Date(endDateInput) : new Date(startDateInput),
-      time: `${selectedHour}시 ${selectedMinute}분`,
-      type: activeTab,
-      displayType: displayType,
-      color: finalColor, 
-      memo,
-      repeat
-    });
+onAddEvent({
+  title,
+  date: new Date(startDateInput),
+  endDate:
+    displayType !== 'todo' && endDateInput
+      ? new Date(endDateInput)
+      : new Date(startDateInput),
+
+  time: `${selectedHour}시 ${selectedMinute}분`,
+  type: activeTab,
+  displayType,
+  color: finalColor,
+  memo,
+  repeat,
+
+  repeatDays // 추가
+});
 
     setTitle('');
     setEndDateInput('');
@@ -97,6 +112,31 @@ export function SidePanel({
       setScheduleColor(color);
     } else {
       setRoutineColor(color);
+    }
+  };
+
+  // 💡 [추가] 등록 버튼 라벨을 탭/타입별로 각각 분리하여 표시합니다.
+  const getSubmitLabel = () => {
+    if (activeTab === 'routine') return '루틴 추가';
+    switch (displayType) {
+      case 'range':
+        return '구간 추가';
+      case 'todo':
+        return '할 일 추가';
+      default:
+        return '일정 추가';
+    }
+  };
+
+  // 💡 [추가] 이벤트 목록에 표시되는 타입 라벨을 displayType 3종에 맞게 분기합니다.
+  const getDisplayTypeLabel = (type: Event['displayType']) => {
+    switch (type) {
+      case 'range':
+        return '(구간 일정)';
+      case 'todo':
+        return '(할 일 블록)';
+      default:
+        return '(일정)';
     }
   };
 
@@ -139,26 +179,30 @@ export function SidePanel({
           ) : (
             currentDayEvents.filter(e => e.type === activeTab).map((event) => {
               const colors = colorMap[event.color as keyof typeof colorMap] || colorMap.purple;
+              const isTodo = event.displayType === 'todo';
               const isCompleted = event.completedDates?.includes(selectedDateIso);
 
               return (
                 <div 
                   key={event.id}
-                  onClick={() => handleToggleComplete(event)}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${colors.bg} ${isCompleted ? 'opacity-40' : ''}`}
+                  onClick={() => { if (isTodo) handleToggleComplete(event); }}
+                  className={`p-3.5 rounded-xl border transition-all flex items-center justify-between ${colors.bg} ${isTodo ? 'cursor-pointer' : ''} ${isTodo && isCompleted ? 'opacity-40' : ''}`}
                 >
                   <div className="flex flex-col gap-0.5 max-w-[80%]">
                     <div className="flex items-center gap-1.5">
-                      <input 
-                        type="checkbox" 
-                        checked={!!isCompleted} 
-                        readOnly 
-                        className="rounded text-blue-600 focus:ring-0 w-3.5 h-3.5 cursor-pointer" 
-                      />
-                      <span className={`font-bold text-xs truncate ${isCompleted ? 'line-through opacity-60' : ''}`}>{event.title}</span>
+                      {/* 💡 [수정] 체크박스는 '할 일 등록(todo)' 타입에서만 노출 및 사용 */}
+                      {isTodo && (
+                        <input 
+                          type="checkbox" 
+                          checked={!!isCompleted} 
+                          readOnly 
+                          className="rounded text-blue-600 focus:ring-0 w-3.5 h-3.5 cursor-pointer" 
+                        />
+                      )}
+                      <span className={`font-bold text-xs truncate ${isTodo && isCompleted ? 'line-through opacity-60' : ''}`}>{event.title}</span>
                     </div>
                     <span className="text-[10px] opacity-75 font-semibold">
-                      {event.time} {event.displayType === 'range' ? '(구간 일정)' : '(할 일 블록)'}
+                      {event.time} {getDisplayTypeLabel(event.displayType)}
                     </span>
                     {event.memo && <p className="text-[10px] opacity-60 truncate mt-1">{event.memo}</p>}
                   </div>
@@ -179,26 +223,44 @@ export function SidePanel({
       <div className="border-t pt-4 mt-4 flex flex-col gap-3 flex-shrink-0">
         
         {/* 하위 세그먼트 토글 탭 */}
-        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
-          <button
-            type="button"
-            onClick={() => setDisplayType('range')}
-            className={`flex-1 py-1.5 text-xs font-extrabold rounded-lg transition-all ${
-              displayType === 'range' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            ↔️ 구간 등록
-          </button>
-          <button
-            type="button"
-            onClick={() => setDisplayType('todo')}
-            className={`flex-1 py-1.5 text-xs font-extrabold rounded-lg transition-all ${
-              displayType === 'todo' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            📝 할 일 등록
-          </button>
-        </div>
+        {/* 💡 [수정] '일정' 탭에서는 일정등록/구간등록/할일등록 3개 버튼으로, '루틴' 탭에서는 루틴등록 단일 표시로 분기 */}
+        {activeTab === 'schedule' ? (
+          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 gap-1">
+            <button
+              type="button"
+              onClick={() => setDisplayType('schedule')}
+              className={`flex-1 py-1.5 text-xs font-extrabold rounded-lg transition-all ${
+                displayType === 'schedule' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              📌 일정 등록
+            </button>
+            <button
+              type="button"
+              onClick={() => setDisplayType('range')}
+              className={`flex-1 py-1.5 text-xs font-extrabold rounded-lg transition-all ${
+                displayType === 'range' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              ↔️ 구간 등록
+            </button>
+            <button
+              type="button"
+              onClick={() => setDisplayType('todo')}
+              className={`flex-1 py-1.5 text-xs font-extrabold rounded-lg transition-all ${
+                displayType === 'todo' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              📝 할 일 등록
+            </button>
+          </div>
+        ) : (
+          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+            <div className="flex-1 py-1.5 text-xs font-extrabold rounded-lg bg-white text-blue-600 shadow-sm text-center">
+              🔄 루틴 등록
+            </div>
+          </div>
+        )}
 
         {/* 타이틀 입력 */}
         <input
@@ -210,23 +272,34 @@ export function SidePanel({
         />
 
         {/* 날짜 범위 지정 */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* 💡 [수정] '할 일 등록'은 등록일 1칸만, 일정/구간 등록은 시작일/종료일 2칸을 표시 */}
+        {displayType === 'todo' ? (
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-gray-400">시작일</label>
-            <input type="date" value={startDateInput} onChange={(e) => setStartDateInput(e.target.value)} className="border text-xs p-1.5 rounded-lg text-gray-600 font-medium w-full focus:outline-none" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-gray-400">종료일</label>
+            <label className="text-[10px] font-bold text-gray-400">등록일</label>
             <input 
               type="date" 
-              value={endDateInput} 
-              disabled={displayType === 'todo'}
-              placeholder={displayType === 'todo' ? '종료일 없음' : ''}
-              onChange={(e) => setEndDateInput(e.target.value)} 
-              className={`border text-xs p-1.5 rounded-lg text-gray-600 font-medium w-full focus:outline-none ${displayType === 'todo' ? 'bg-gray-50 text-gray-300 cursor-not-allowed' : ''}`} 
+              value={startDateInput} 
+              onChange={(e) => setStartDateInput(e.target.value)} 
+              className="border text-xs p-1.5 rounded-lg text-gray-600 font-medium w-full focus:outline-none" 
             />
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-gray-400">시작일</label>
+              <input type="date" value={startDateInput} onChange={(e) => setStartDateInput(e.target.value)} className="border text-xs p-1.5 rounded-lg text-gray-600 font-medium w-full focus:outline-none" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-gray-400">종료일</label>
+              <input 
+                type="date" 
+                value={endDateInput} 
+                onChange={(e) => setEndDateInput(e.target.value)} 
+                className="border text-xs p-1.5 rounded-lg text-gray-600 font-medium w-full focus:outline-none" 
+              />
+            </div>
+          </div>
+        )}
 
         {/* 상세 옵션 제어 행 */}
         <div className="grid grid-cols-3 gap-2">
@@ -250,6 +323,31 @@ export function SidePanel({
               <option value="monthly">매월</option>
               <option value="yearly">매년</option>
             </select>
+              {repeat !== 'none' && (
+  <div className="flex flex-wrap gap-1 mt-2">
+    {['일','월','화','수','목','금','토'].map((day, idx) => (
+      <button
+        key={idx}
+        type="button"
+        onClick={() => {
+          setRepeatDays(prev =>
+            prev.includes(idx)
+              ? prev.filter(d => d !== idx)
+              : [...prev, idx]
+          );
+        }}
+        className={`w-8 h-8 rounded-full text-xs font-bold
+        ${
+          repeatDays.includes(idx)
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-100 text-gray-600'
+        }`}
+      >
+        {day}
+      </button>
+    ))}
+  </div>
+)}
           </div>
         </div>
 
@@ -290,7 +388,8 @@ export function SidePanel({
             onClick={handleSubmit}
             className="px-5 py-2.5 text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 rounded-xl shadow-sm transition-colors self-end"
           >
-            {activeTab === 'schedule' ? '일정 추가' : '루틴 추가'}
+            {/* 💡 [수정] 일정/구간/할일/루틴 등록 버튼 라벨을 각각 분리하여 표시 */}
+            {getSubmitLabel()}
           </button>
         </div>
 
