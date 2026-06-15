@@ -1,6 +1,5 @@
 // @ts-ignore
-import aiImage from "../../../imports/image-2.png";
-
+import aiImage from "../../../assets/images/image-2.png";
 type Schedule = {
     time: string;
     title: string;
